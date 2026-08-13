@@ -1,3 +1,7 @@
+---
+description: Publish a new version of this npm package
+---
+
 Publish a new version of this npm package by following these steps in order:
 
 1. Read `package.json` and find the current `version` field.

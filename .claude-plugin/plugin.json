@@ -1,0 +1,55 @@
+{
+  "name": "targetprocess-mcp",
+  "displayName": "Targetprocess",
+  "version": "2.6.6",
+  "description": "MCP server connecting Claude to Targetprocess REST API",
+  "author": {
+    "name": "Serhii Maksymiv"
+  },
+  "repository": "https://github.com/SerhiiMaksymiv/targetprocess-mcp-server",
+  "license": "ISC",
+  "userConfig": {
+    "tp_token": {
+      "type": "string",
+      "title": "Targetprocess API Token",
+      "description": "Settings -> Authentication and Security -> New Access Token",
+      "sensitive": true,
+      "required": true
+    },
+    "tp_base_url": {
+      "type": "string",
+      "title": "Targetprocess Base URL",
+      "description": "Your Targetprocess API endpoint, e.g. https://yourcompany.tpondemand.com/api/v1",
+      "required": true
+    },
+    "tp_owner_id": {
+      "type": "string",
+      "title": "Targetprocess Owner ID",
+      "description": "Your Targetprocess user ID (find via the get_logged_in_user tool)",
+      "required": true
+    },
+    "tp_project_id": {
+      "type": "string",
+      "title": "Targetprocess Project ID",
+      "description": "Default project ID (find via the get_projects tool)"
+    },
+    "tp_team_id": {
+      "type": "string",
+      "title": "Targetprocess Team ID",
+      "description": "Default team ID (find via the get_teams tool)"
+    }
+  },
+  "mcpServers": {
+    "targetprocess": {
+      "command": "npx",
+      "args": ["-y", "targetprocess-mcp-server"],
+      "env": {
+        "TP_BASE_URL": "${user_config.tp_base_url}",
+        "TP_TOKEN": "${user_config.tp_token}",
+        "TP_OWNER_ID": "${user_config.tp_owner_id}",
+        "TP_PROJECT_ID": "${user_config.tp_project_id}",
+        "TP_TEAM_ID": "${user_config.tp_team_id}"
+      }
+    }
+  }
+}

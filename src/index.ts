@@ -474,7 +474,6 @@ server.registerTool(
         "Developer Raised",
         "Operations",
       ])
-        .default("Manual QA")
         .optional()
         .describe('Where the bug was found, defaults to "Manual QA" if no origin was specified'),
       projectId: z.string()
@@ -550,7 +549,7 @@ server.registerTool(
         .describe('Optional Team ID — if user gave a team name, resolve it via "get_teams" first; defaults to TP_TEAM_ID from config'),
       entityStateId: z.string()
         .optional()
-        .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Done"'),
+        .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Backlog"'),
       tags: z.string()
         .optional()
         .describe('Optional comma-separated tags to apply, e.g. "regression, mobile"'),
@@ -700,7 +699,7 @@ server.registerTool(
         .describe('Optional Team ID — if user gave a team name, resolve it via "get_teams" first; defaults to TP_TEAM_ID from config'),
       entityStateId: z.string()
         .optional()
-        .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Done"'),
+        .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Backlog" or "To Do"'),
       tags: z.string()
         .optional()
         .describe('Optional comma-separated tags to apply, e.g. "regression, mobile"'),
@@ -864,7 +863,12 @@ server.registerTool(
         1) Header — "businessBackground" is a 1-2 sentence value statement: who benefits and why;
         2) Definitions — cross-cutting terms used across multiple child stories, so they aren't redefined at every story level; if none apply, OMIT "definitions" entirely (do not send an empty section);
         3) Scope & Boundaries — what this feature explicitly includes/excludes, to stop child stories drifting into adjacent features; omit if genuinely trivial;
-        4) Non-Functional Requirements ("nonFunctionalRequirements") — every NFR category (Security, Compliance, Billing, Operational, etc.) MUST be converted from prose into one row with status "Covered" (link the child story/scenario that proves it in storyOrOwner), "Gap" (no story covers it yet — storyOrOwner names who should follow up), or "Decision needed" (genuinely still open, not testable until resolved). This is the core of the template — never leave an NFR as untested prose;
+        4) Non-Functional Requirements ("nonFunctionalRequirements") — this is the core of the template and doubles as ISO 27001:2022 audit evidence that NFRs (including information security, per Annex A Control 5.8) are considered at design time, not bolted on after. EVERY feature MUST include these four fixed rows, worded exactly as below (do not reword the questions — consistency in the questions is what makes them auditable), each answered SPECIFICALLY for this feature in "storyOrOwner" — a real, checkable answer (e.g. which systems/data/roles are involved), never a generic "considered" placeholder:
+           - area "System performance" / requirement "What does this feature add or change in terms of load, queries, polling, rendering etc., and what's the expected impact, if any?";
+           - area "Information security (ISO 27001:2022 Annex A 5.8)" / requirement "What personal or sensitive data does this feature touch, and what protects its privacy, confidentiality, integrity and availability?";
+           - area "Quality control" / requirement "How will this feature's behaviour and failures be measured or tested, and what happens when it fails?";
+           - area "Service logging" / requirement "What events or states should be logged so product support can diagnose an issue without reproducing it manually?";
+           For each row, set status to "Covered" (storyOrOwner holds the specific answer, or the child story/scenario that proves it), "Gap" (no answer/story yet — storyOrOwner names who should follow up), or "Decision needed" (genuinely open, not answerable yet). If any of the four is unclear, follow-up owner in rather than guessing — he's the named escalation contact, not a mandatory sign-off gate. Additional NFR categories beyond these four (Compliance, Billing, Operational, etc.) can still be added as extra rows when relevant, using the same Covered/Gap/Decision-needed treatment;
         5) Cross-Cutting Scenarios — ONLY for behavior spanning multiple child stories that wouldn't naturally sit in any one of them (e.g. tenant isolation across all stories); do not duplicate per-story Gherkin here; omit if none apply;
         6) Child Stories ("childStories") — pull this from "get_feature_user_stories" / "get_not_covered_user_stories_in_feature" rather than retyping it; keep it as a live pointer, not a duplicate spec; normally empty when first creating the feature;
         7) Open Questions / Risks ("openQuestions") — anything raised at feature conception that hasn't been resolved into either a Covered NFR row or a child story; this is the section most likely to get silently dropped — treat it as the running "not done yet" list until each line is promoted to a Covered NFR row;
@@ -916,7 +920,7 @@ server.registerTool(
           .describe('If Covered, the child story ID/scenario that proves it; if Gap or Decision needed, who owns the follow-up (e.g. "Needs legal/BA follow-up")'),
       }))
         .min(1)
-        .describe('Every NFR category converted from prose into a testable/decided row — the core of this template. Do not leave requirements as untested prose'),
+        .describe('Every NFR category converted from prose into a testable/decided row — the core of this template. MUST include the four fixed rows required for ISO 27001:2022 audit evidence: "System performance", "Information security (ISO 27001:2022 Annex A 5.8)", "Quality control", and "Service logging" — worded exactly, each answered specifically for this feature (escalate unclear items to story owner). Additional categories may be added beyond these four. Do not leave requirements as untested prose'),
       crossCuttingScenarios: z.array(z.object({
         name: z.string()
           .describe('Scenario name'),

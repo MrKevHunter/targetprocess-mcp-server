@@ -159,6 +159,51 @@ Developer Tools
 ---
 
 ## Installation
+### As a Claude Code Plugin
+
+**Prerequisites:** Claude Code CLI installed, and a Targetprocess account with API access.
+
+1. **Get your Targetprocess API token**
+   In Targetprocess, go to *Settings → Authentication and Security → New Access Token* and copy it.
+
+2. **Add this repo as a plugin marketplace**
+   Run inside Claude Code:
+   ```bash
+   /plugin marketplace add SerhiiMaksymiv/targetprocess-mcp-server
+   ```
+
+3. **Install the plugin**
+   ```bash
+   /plugin install targetprocess-mcp
+   ```
+
+4. **Fill in the configuration prompts**
+   Claude Code will ask for each value in turn:
+   | Prompt | What to enter |
+   |---|---|
+   | Targetprocess API Token | The token from step 1 (input is masked) |
+   | Targetprocess Base URL | Your API endpoint, e.g. `https://yourcompany.tpondemand.com/api/v1` |
+   | Targetprocess Owner ID | Your user ID — leave the default flow, install first and run the `get_logged_in_user` tool to look it up if you don't know it yet |
+   | Targetprocess Project ID *(optional)* | Look up via the `get_projects` tool — press Enter to skip |
+   | Targetprocess Team ID *(optional)* | Look up via the `get_teams` tool — press Enter to skip |
+
+   Values are stored by Claude Code (the token is kept masked/sensitive) — no manual editing of `settings.json` needed.
+
+5. **Restart Claude Code** (or start a new session) so the plugin's MCP server connects with the new config.
+
+6. **Verify it's connected**
+   ```bash
+   /mcp
+   ```
+   `targetprocess` should show as connected. Try asking Claude something like *"show me the current active release"* to confirm the tools work end to end.
+
+**Updating config later:** re-run `/plugin install targetprocess-mcp` (or use `/plugin` to manage installed plugins) to be re-prompted for values.
+
+**Uninstalling:**
+```bash
+/plugin uninstall targetprocess-mcp
+```
+
 ### Local Installation for Development
 ```json
 {

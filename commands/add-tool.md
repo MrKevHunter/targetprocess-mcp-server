@@ -1,3 +1,7 @@
+---
+description: Add a new tool to this MCP server
+---
+
 Add a new tool to this MCP server by following these steps in order:
 
 1. Ask the user for the tool name, what TP API endpoint it should call, and what parameters it needs.

@@ -1,3 +1,7 @@
+---
+description: Add, commit, and push all current changes
+---
+
 Add, commit, and push all current changes by following these steps in order:
 
 1. Run `git status` to see what files have changed.
