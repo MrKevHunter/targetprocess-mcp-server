@@ -31,6 +31,14 @@ describe('handleUpdateBug', () => {
     expect(result.content[0].text).toContain('Failed to update bug')
   })
 
+  it('passes releaseId to updateBug', async () => {
+    vi.mocked(mockTp.updateBug).mockResolvedValue({ Id: 145789, Name: 'Bug' } as any)
+
+    await handleUpdateBug(mockTp, { id: '145789', releaseId: '999' })
+
+    expect(mockTp.updateBug).toHaveBeenCalledWith({ id: '145789', releaseId: '999' })
+  })
+
   it('assigns the developer role when developerId is provided, without sending it to updateBug', async () => {
     vi.mocked(mockTp.updateBug).mockResolvedValue({ Id: 145789, Name: 'Bug' } as any)
     vi.mocked(mockTp.assignDeveloper).mockResolvedValue({ Id: 999 } as any)

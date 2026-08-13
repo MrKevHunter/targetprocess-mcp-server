@@ -10,6 +10,7 @@ export async function handleUpdateBug(
     projectId?: string
     teamId?: string
     entityStateId?: string
+    releaseId?: string
     tags?: string
     teamIterationId?: string
     developerId?: string

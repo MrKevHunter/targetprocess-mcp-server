@@ -516,7 +516,8 @@ server.registerTool(
         2) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
         3) IF the user specified a state by name (not ID), call "get_bug_workflows" to find the matching state and use its ID as entityStateId;
         4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;
-        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;`,
+        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;
+        6) IF the user specified a release by name, call "get_current_releases" to find the matching release and use its ID as releaseId;`,
     inputSchema: {
       id: z.string()
         .min(5)
@@ -550,6 +551,9 @@ server.registerTool(
       entityStateId: z.string()
         .optional()
         .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Backlog"'),
+      releaseId: z.string()
+        .optional()
+        .describe('Optional Release ID to assign this bug to — if user gave a release name, resolve it via "get_current_releases" first'),
       tags: z.string()
         .optional()
         .describe('Optional comma-separated tags to apply, e.g. "regression, mobile"'),
@@ -561,8 +565,8 @@ server.registerTool(
         .describe('Optional TP user ID to assign as Developer on this bug — resolve via "get_logged_in_user" (to assign yourself) or "get_users" (to assign someone else by name) first'),
     },
   },
-  async ({ id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId, developerId }) =>
-    handleUpdateBug(tp, { id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId, developerId })
+  async ({ id, title, bugContent, origin, projectId, teamId, entityStateId, releaseId, tags, teamIterationId, developerId }) =>
+    handleUpdateBug(tp, { id, title, bugContent, origin, projectId, teamId, entityStateId, releaseId, tags, teamIterationId, developerId })
 )
 
 server.registerTool(
@@ -601,7 +605,8 @@ server.registerTool(
         2) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
         3) IF the user specified a state by name (not ID), call "get_user_story_workflows" to find the matching state and use its ID as entityStateId;
         4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;
-        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;`,
+        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;
+        6) IF the user specified a release by name, call "get_current_releases" to find the matching release and use its ID as releaseId;`,
     inputSchema: {
       id: z.string()
         .min(5)
@@ -625,6 +630,9 @@ server.registerTool(
       featureId: z.string()
         .optional()
         .describe('Optional Feature ID — moves this user story to the specified feature'),
+      releaseId: z.string()
+        .optional()
+        .describe('Optional Release ID to assign this user story to — if user gave a release name, resolve it via "get_current_releases" first'),
       tags: z.string()
         .optional()
         .describe('Optional comma-separated tags to apply, e.g. "regression, mobile"'),
@@ -636,8 +644,8 @@ server.registerTool(
         .describe('Optional TP user ID to assign as Developer on this story — resolve via "get_logged_in_user" (to assign yourself) or "get_users" (to assign someone else by name) first'),
     },
   },
-  async ({ id, title, description, projectId, teamId, entityStateId, featureId, tags, teamIterationId, developerId }) => {
-    const response = await tp.updateUserStory<any>({ id, title, description, projectId, teamId, entityStateId, featureId, tags, teamIterationId });
+  async ({ id, title, description, projectId, teamId, entityStateId, featureId, releaseId, tags, teamIterationId, developerId }) => {
+    const response = await tp.updateUserStory<any>({ id, title, description, projectId, teamId, entityStateId, featureId, releaseId, tags, teamIterationId });
 
     if (!response) {
       return {

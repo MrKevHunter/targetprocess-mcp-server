@@ -286,9 +286,10 @@ export class TpClient {
     teamId,
     entityStateId,
     featureId,
+    releaseId,
     tags,
     teamIterationId
-  }: { id: string, title?: string, description?: string, projectId?: string, teamId?: string, teamAssignmentId?: string, entityStateId?: string, featureId?: string, tags?: string, teamIterationId?: string }): Promise<T> {
+  }: { id: string, title?: string, description?: string, projectId?: string, teamId?: string, teamAssignmentId?: string, entityStateId?: string, featureId?: string, releaseId?: string, tags?: string, teamIterationId?: string }): Promise<T> {
     const userStory: Record<string, any> = { "Id": id }
 
     if (title) userStory["Name"] = title
@@ -297,6 +298,7 @@ export class TpClient {
     if (teamId) userStory["assignedTeams"] = [{ "team": { "id": teamId } }]
     if (entityStateId) userStory["EntityState"] = { "Id": entityStateId }
     if (featureId) userStory["Feature"] = { "Id": featureId }
+    if (releaseId) userStory["Release"] = { "Id": releaseId }
     if (tags) userStory["Tags"] = tags
     if (teamIterationId) userStory["TeamIteration"] = { "Id": teamIterationId }
 
@@ -306,7 +308,7 @@ export class TpClient {
     }, userStory) as T
   }
 
-  async updateBug<T>({ id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId }: { id: string, title?: string, bugContent?: string, origin?: string, projectId?: string, teamId?: string, entityStateId?: string, tags?: string, teamIterationId?: string }): Promise<T> {
+  async updateBug<T>({ id, title, bugContent, origin, projectId, teamId, entityStateId, releaseId, tags, teamIterationId }: { id: string, title?: string, bugContent?: string, origin?: string, projectId?: string, teamId?: string, entityStateId?: string, releaseId?: string, tags?: string, teamIterationId?: string }): Promise<T> {
     const bug: Record<string, any> = { "Id": id }
 
     if (title) bug["Name"] = title
@@ -323,6 +325,7 @@ export class TpClient {
       }
     }]
     if (entityStateId) bug["entityState"] = { "id": entityStateId }
+    if (releaseId) bug["Release"] = { "Id": releaseId }
     if (tags) bug["Tags"] = tags
     if (teamIterationId) bug["TeamIteration"] = { "Id": teamIterationId }
 
