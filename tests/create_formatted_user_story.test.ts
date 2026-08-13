@@ -19,7 +19,7 @@ beforeEach(() => {
 
 describe('handleCreateFormattedUserStory', () => {
   it('returns created user story on success', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 145789, Name: 'Login with SSO' } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 145789, Name: 'Login with SSO' } } as any)
 
     const result = await handleCreateFormattedUserStory(mockTp, baseParams)
     const parsed = JSON.parse(result.content[0].text)
@@ -27,16 +27,22 @@ describe('handleCreateFormattedUserStory', () => {
     expect(parsed.Id).toBe(145789)
   })
 
-  it('returns failure message when null', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue(null as any)
+  it('surfaces HTTP status and response body on failure', async () => {
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({
+      ok: false,
+      status: 422,
+      body: '{"Status":"BadRequest","Message":"Project is required"}',
+    } as any)
 
     const result = await handleCreateFormattedUserStory(mockTp, baseParams)
 
     expect(result.content[0].text).toContain('Failed to create formatted user story "Login with SSO"')
+    expect(result.content[0].text).toContain('HTTP status: 422')
+    expect(result.content[0].text).toContain('Project is required')
   })
 
   it('assembles sections in Header, Scenarios, Acceptance Criteria order', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateFormattedUserStory(mockTp, baseParams)
 
@@ -51,7 +57,7 @@ describe('handleCreateFormattedUserStory', () => {
   })
 
   it('omits the Definitions section when definitions is not provided', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateFormattedUserStory(mockTp, baseParams)
 
@@ -60,7 +66,7 @@ describe('handleCreateFormattedUserStory', () => {
   })
 
   it('includes the Definitions section when provided', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateFormattedUserStory(mockTp, {
       ...baseParams,
@@ -73,7 +79,7 @@ describe('handleCreateFormattedUserStory', () => {
   })
 
   it('includes Examples Table and Edge Cases sections when provided', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateFormattedUserStory(mockTp, {
       ...baseParams,
@@ -88,7 +94,7 @@ describe('handleCreateFormattedUserStory', () => {
   })
 
   it('calls createUserStory with title and linking IDs', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateFormattedUserStory(mockTp, { ...baseParams, featureId: '145636', releaseId: '145200', teamId: '20' })
 

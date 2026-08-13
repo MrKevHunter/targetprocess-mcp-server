@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('handleCreateBug', () => {
   it('returns created bug on success', async () => {
-    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ Id: 500, Name: 'Login fails' } as any)
+    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ ok: true, data: { Id: 500, Name: 'Login fails' } } as any)
 
     const result = await handleCreateBug(mockTp, { title: 'Login fails', bugContent: '<div>Steps...</div>' })
     const parsed = JSON.parse(result.content[0].text)
@@ -31,16 +31,22 @@ describe('handleCreateBug', () => {
     expect(parsed.Name).toBe('Login fails')
   })
 
-  it('returns failure message when null', async () => {
-    vi.mocked(mockTp.createBugOnly).mockResolvedValue(null as any)
+  it('surfaces HTTP status and response body on failure', async () => {
+    vi.mocked(mockTp.createBugOnly).mockResolvedValue({
+      ok: false,
+      status: 422,
+      body: '{"Status":"BadRequest","Message":"Project is required"}',
+    } as any)
 
     const result = await handleCreateBug(mockTp, { title: 'Login fails', bugContent: '<div>Steps</div>' })
 
     expect(result.content[0].text).toContain('Failed to create bug "Login fails"')
+    expect(result.content[0].text).toContain('HTTP status: 422')
+    expect(result.content[0].text).toContain('Project is required')
   })
 
   it('calls createBugOnly with all params', async () => {
-    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateBug(mockTp, {
       title: 'Bug', bugContent: 'content', origin: 'Manual QA', projectId: '10', teamId: '20',
@@ -52,7 +58,7 @@ describe('handleCreateBug', () => {
   })
 
   it('passes tags and teamIterationId to createBugOnly', async () => {
-    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createBugOnly).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateBug(mockTp, {
       title: 'Bug', bugContent: 'content', tags: 'regression, mobile', teamIterationId: '789',
@@ -66,7 +72,7 @@ describe('handleCreateBug', () => {
 
 describe('handleCreateUserStory', () => {
   it('returns created user story on success', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 600, Name: 'User can register' } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 600, Name: 'User can register' } } as any)
 
     const result = await handleCreateUserStory(mockTp, { title: 'User can register' })
     const parsed = JSON.parse(result.content[0].text)
@@ -75,16 +81,22 @@ describe('handleCreateUserStory', () => {
     expect(parsed.Name).toBe('User can register')
   })
 
-  it('returns failure message when null', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue(null as any)
+  it('surfaces HTTP status and response body on failure', async () => {
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({
+      ok: false,
+      status: 422,
+      body: '{"Status":"BadRequest","Message":"Project is required"}',
+    } as any)
 
     const result = await handleCreateUserStory(mockTp, { title: 'Some story' })
 
     expect(result.content[0].text).toContain('Failed to create user story "Some story"')
+    expect(result.content[0].text).toContain('HTTP status: 422')
+    expect(result.content[0].text).toContain('Project is required')
   })
 
   it('passes optional fields to client', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateUserStory(mockTp, { title: 'Story', featureId: '123', releaseId: '456' })
 
@@ -94,7 +106,7 @@ describe('handleCreateUserStory', () => {
   })
 
   it('passes tags and teamIterationId to createUserStory', async () => {
-    vi.mocked(mockTp.createUserStory).mockResolvedValue({ Id: 1 } as any)
+    vi.mocked(mockTp.createUserStory).mockResolvedValue({ ok: true, data: { Id: 1 } } as any)
 
     await handleCreateUserStory(mockTp, { title: 'Story', tags: 'regression, mobile', teamIterationId: '789' })
 

@@ -12,9 +12,11 @@ export async function handleUpdateBug(
     entityStateId?: string
     tags?: string
     teamIterationId?: string
+    developerId?: string
   },
 ) {
-  const bugResponse = await tp.updateBug<any>(params)
+  const { developerId, ...updateParams } = params
+  const bugResponse = await tp.updateBug<any>(updateParams)
 
   if (!bugResponse) {
     return {
@@ -25,7 +27,15 @@ export async function handleUpdateBug(
     }
   }
 
+  let developerAssignment = null
+  if (developerId) {
+    developerAssignment = await tp.assignDeveloper(params.id, developerId)
+  }
+
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(bugResponse) }],
+    content: [{
+      type: 'text' as const,
+      text: JSON.stringify(developerId ? { ...bugResponse, developerAssignment } : bugResponse)
+    }],
   }
 }

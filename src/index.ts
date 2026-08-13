@@ -516,7 +516,8 @@ server.registerTool(
         1) IF the user specified a team by name (not ID), call "get_teams" to find the matching team and use its ID as teamId;
         2) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
         3) IF the user specified a state by name (not ID), call "get_bug_workflows" to find the matching state and use its ID as entityStateId;
-        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;`,
+        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;
+        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;`,
     inputSchema: {
       id: z.string()
         .min(5)
@@ -556,10 +557,13 @@ server.registerTool(
       teamIterationId: z.string()
         .optional()
         .describe('Optional Team Iteration (sprint) ID — resolve it via "get_team_iterations" first'),
+      developerId: z.string()
+        .optional()
+        .describe('Optional TP user ID to assign as Developer on this bug — resolve via "get_logged_in_user" (to assign yourself) or "get_users" (to assign someone else by name) first'),
     },
   },
-  async ({ id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId }) =>
-    handleUpdateBug(tp, { id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId })
+  async ({ id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId, developerId }) =>
+    handleUpdateBug(tp, { id, title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId, developerId })
 )
 
 server.registerTool(
@@ -597,7 +601,8 @@ server.registerTool(
         1) IF the user specified a team by name (not ID), call "get_teams" to find the matching team and use its ID as teamId;
         2) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
         3) IF the user specified a state by name (not ID), call "get_user_story_workflows" to find the matching state and use its ID as entityStateId;
-        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;`,
+        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;
+        5) IF the user wants to assign a Developer: to assign themselves, call "get_logged_in_user" to get their ID; to assign someone else by name, call "get_users" to find the matching user and use its ID as developerId;`,
     inputSchema: {
       id: z.string()
         .min(5)
@@ -627,9 +632,12 @@ server.registerTool(
       teamIterationId: z.string()
         .optional()
         .describe('Optional Team Iteration (sprint) ID — resolve it via "get_team_iterations" first'),
+      developerId: z.string()
+        .optional()
+        .describe('Optional TP user ID to assign as Developer on this story — resolve via "get_logged_in_user" (to assign yourself) or "get_users" (to assign someone else by name) first'),
     },
   },
-  async ({ id, title, description, projectId, teamId, entityStateId, featureId, tags, teamIterationId }) => {
+  async ({ id, title, description, projectId, teamId, entityStateId, featureId, tags, teamIterationId, developerId }) => {
     const response = await tp.updateUserStory<any>({ id, title, description, projectId, teamId, entityStateId, featureId, tags, teamIterationId });
 
     if (!response) {
@@ -641,10 +649,15 @@ server.registerTool(
       };
     }
 
+    let developerAssignment = null;
+    if (developerId) {
+      developerAssignment = await tp.assignDeveloper(id, developerId);
+    }
+
     return {
       content: [{
         type: 'text',
-        text: JSON.stringify(response)
+        text: JSON.stringify(developerId ? { ...response, developerAssignment } : response)
       }],
     };
   }
@@ -677,9 +690,8 @@ server.registerTool(
         "Developer Raised",
         "Operations",
       ])
-        .default("Manual QA")
         .optional()
-        .describe('Where the bug was found, defaults to "Manual QA" if no origin was specified'),
+        .describe('Where the bug was found. Omit if the project\'s Bug entity type has no Origin custom field (createBugOnly only sends this field when a value is given)'),
       projectId: z.string()
         .optional()
         .describe('Optional Project ID — if user gave a project name, resolve it via "get_projects" first; defaults to TP_PROJECT_ID from config'),

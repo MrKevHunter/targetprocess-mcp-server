@@ -16,16 +16,18 @@ export async function handleCreateBug(
 ) {
   const bugResponse = await tp.createBugOnly<TP.Bug>(params)
 
-  if (!bugResponse) {
+  if (!bugResponse.ok) {
     return {
       content: [{
         type: 'text' as const,
-        text: `Failed to create bug "${params.title}"\n JSON: ${JSON.stringify(bugResponse, null, 2)}`
+        text: `Failed to create bug "${params.title}"\n` +
+          `HTTP status: ${bugResponse.status}\n` +
+          `Response body: ${bugResponse.body}`
       }],
     }
   }
 
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(bugResponse) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(bugResponse.data) }],
   }
 }

@@ -16,16 +16,18 @@ export async function handleCreateUserStory(
 ) {
   const response = await tp.createUserStory<TP.UserStory>(params)
 
-  if (!response) {
+  if (!response.ok) {
     return {
       content: [{
         type: 'text' as const,
-        text: `Failed to create user story "${params.title}"\n JSON: ${JSON.stringify(response, null, 2)}`
+        text: `Failed to create user story "${params.title}"\n` +
+          `HTTP status: ${response.status}\n` +
+          `Response body: ${response.body}`
       }],
     }
   }
 
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(response) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(response.data) }],
   }
 }

@@ -329,17 +329,12 @@ export class TpClient {
     }, bug) as T
   }
 
-  async createBugOnly<T>({ title, bugContent, origin = "Manual QA", projectId, teamId, entityStateId, tags, teamIterationId }: BugInputSchema): Promise<T> {
+  async createBugOnly<T>({ title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId }: BugInputSchema): Promise<TpResult<T>> {
     const bug: Record<string, any> = {
       "Name": title,
       "Project": {
         "Id": projectId || config.tp.projectId
       },
-      "customFields": [{
-        "name": "Origin",
-        "type": "DropDown",
-        "value": origin
-      }],
       "assignedTeams": [{
         "team": {
           "id": teamId || config.tp.teamId
@@ -348,17 +343,22 @@ export class TpClient {
       "Description": bugContent,
     }
 
+    if (origin) bug["customFields"] = [{
+      "name": "Origin",
+      "type": "DropDown",
+      "value": origin
+    }]
     if (entityStateId) bug["EntityState"] = { "Id": entityStateId }
     if (tags) bug["Tags"] = tags
     if (teamIterationId) bug["TeamIteration"] = { "Id": teamIterationId }
 
-    return this.post<any, T>({
+    return this.postRaw<any, T>({
       pathParam: ["bugs"],
       param: { "format": "json" },
-    }, bug) as T
+    }, bug)
   }
 
-  async createUserStory<T>({ title, description, featureId, releaseId, projectId, teamId, tags, teamIterationId }: { title: string, description?: string, featureId?: string, releaseId?: string, projectId?: string, teamId?: string, tags?: string, teamIterationId?: string }): Promise<T> {
+  async createUserStory<T>({ title, description, featureId, releaseId, projectId, teamId, tags, teamIterationId }: { title: string, description?: string, featureId?: string, releaseId?: string, projectId?: string, teamId?: string, tags?: string, teamIterationId?: string }): Promise<TpResult<T>> {
     const userStory: Record<string, any> = {
       "Name": title,
       "Project": { "Id": projectId || config.tp.projectId },
@@ -371,10 +371,10 @@ export class TpClient {
     if (tags) userStory["Tags"] = tags
     if (teamIterationId) userStory["TeamIteration"] = { "Id": teamIterationId }
 
-    return this.post<any, T>({
+    return this.postRaw<any, T>({
       pathParam: ["UserStories"],
       param: { "format": "json" },
-    }, userStory) as T
+    }, userStory)
   }
 
   async getTeamIterations<T>({ teamId }: { teamId?: string } = {}): Promise<T> {
@@ -1205,6 +1205,20 @@ export class TpClient {
       pathParam: ["Roles"],
       param: { "format": "json" },
     })
+  }
+
+  // Resolves the "Developer" role by name so callers don't need to know its
+  // Role ID up front, then assigns it via the same Assignments endpoint as assignRole.
+  async assignDeveloper(cardId: string, userId: string): Promise<RoleAssignment | null> {
+    const roles = await this.get<TpResponse<{ Id: number; Name: string }>>({
+      pathParam: ["Roles"],
+      param: { "format": "json" },
+    })
+
+    const developerRole = roles?.Items?.find((role) => role.Name.toLowerCase() === "developer")
+    if (!developerRole) return null
+
+    return this.assignRole(cardId, userId, String(developerRole.Id))
   }
 
   async getMyTimeLogs<T>(take: number = 25): Promise<T> {
