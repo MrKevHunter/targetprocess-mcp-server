@@ -23,8 +23,8 @@ describe('handleUpdateBug', () => {
     expect(mockTp.assignDeveloper).not.toHaveBeenCalled()
   })
 
-  it('returns failure message when null', async () => {
-    vi.mocked(mockTp.updateBug).mockResolvedValue(null as any)
+  it('returns failure message when updateBug errors', async () => {
+    vi.mocked(mockTp.updateBug).mockResolvedValue(new Error('Simulated failure') as any)
 
     const result = await handleUpdateBug(mockTp, { id: '145789' })
 
@@ -52,7 +52,7 @@ describe('handleUpdateBug', () => {
   })
 
   it('does not call assignDeveloper when the bug update fails', async () => {
-    vi.mocked(mockTp.updateBug).mockResolvedValue(null as any)
+    vi.mocked(mockTp.updateBug).mockResolvedValue(new Error('Simulated failure') as any)
 
     await handleUpdateBug(mockTp, { id: '145789', developerId: '4242' })
 

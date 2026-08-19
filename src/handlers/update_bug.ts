@@ -7,10 +7,10 @@ export async function handleUpdateBug(
     title?: string
     bugContent?: string
     origin?: string
+    releaseId?: string
     projectId?: string
     teamId?: string
     entityStateId?: string
-    releaseId?: string
     tags?: string
     teamIterationId?: string
     developerId?: string
@@ -19,11 +19,11 @@ export async function handleUpdateBug(
   const { developerId, ...updateParams } = params
   const bugResponse = await tp.updateBug<any>(updateParams)
 
-  if (!bugResponse) {
+  if (bugResponse instanceof Error) {
     return {
       content: [{
         type: 'text' as const,
-        text: `Failed to update bug "${params.title}"\n JSON: ${JSON.stringify(bugResponse, null, 2)}`
+        text: `Failed to update bug "${params.title}"\n Error: ${bugResponse.message}`
       }],
     }
   }

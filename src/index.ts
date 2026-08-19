@@ -28,6 +28,7 @@ import { handleAddComment } from "./handlers/add_comment.js";
 import { handleGetUserStoryComments } from "./handlers/get_user_story_comments.js";
 import { handleGetBugComments } from "./handlers/get_bug_comments.js";
 import { handleCreateBug } from "./handlers/create_bug.js";
+import { handleCreateBugBasedOnCard } from "./handlers/create_bug_based_on_card.js";
 import { handleCreateUserStory } from "./handlers/create_user_story.js";
 import { handleCreateFormattedUserStory } from "./handlers/create_formatted_user_story.js";
 import { handleCreateFormattedFeature } from "./handlers/create_formatted_feature.js";
@@ -353,7 +354,7 @@ server.registerTool(
   async ({ id, comment, user }) => {
     try {
       const addCommentResponse = await tp.addCommentWithUser<TP.Comment>(id, comment, (user as TP.LoggedUser));
-      if (!addCommentResponse) {
+      if (addCommentResponse instanceof Error) {
         return {
           content: [{
             type: 'text',
@@ -446,7 +447,8 @@ server.registerTool(
         3) format the new bug inside html <div> tags with Environment (describes where bug was found, dev, feature, review or uat Environment), Issue Description, Steps to Reproduce, Expected Behavior, Actual Behavior and Attachments sections (note: section titles should be wrapped in <h3> tags, e.g. <h3>Issue Description</h3>);
         4) IF the user specified a team by name (not ID), call "get_teams" to find the matching team and use its ID as teamId;
         5) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
-        6) add a comment to the card with created bug Id and its Title`,
+        6) IF the user specified a release by name (not ID), call "get_current_releases" to find the matching release and use its ID as releaseId;
+        7) add a comment to the card with created bug Id and its Title`,
     inputSchema: {
       title: z.string()
         .describe('Bug card title that summarizes the problem in concise, descriptive, and actionable manner, enabling a developer to understand the issue without opening the report'),
@@ -476,6 +478,11 @@ server.registerTool(
       ])
         .optional()
         .describe('Where the bug was found, defaults to "Manual QA" if no origin was specified'),
+      releaseId: z.string()
+        .min(5)
+        .max(9)
+        .optional()
+        .describe('Optional Release ID to assign this bug to — if user gave a release name, resolve it via "get_current_releases" first'),
       projectId: z.string()
         .optional()
         .describe('Optional Project ID — if user gave a project name, resolve it via "get_projects" first; defaults to TP_PROJECT_ID from config'),
@@ -484,25 +491,8 @@ server.registerTool(
         .describe('Optional Team ID — if user gave a team name, resolve it via "get_teams" first; defaults to TP_TEAM_ID from config'),
     },
   },
-  async ({ title, card, bugContent, origin, projectId, teamId }) => {
-    const bugResponse = await tp.createBug<TP.Bug>({ title, card, bugContent, origin, projectId, teamId });
-
-    if (!bugResponse) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Failed to create bug "${title}"\n JSON: ${JSON.stringify(bugResponse, null, 2)}`
-        }]
-      };
-    }
-
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(bugResponse)
-      }],
-    };
-  }
+  async ({ title, card, bugContent, origin, releaseId, projectId, teamId }) =>
+    handleCreateBugBasedOnCard(tp, { title, card, bugContent, origin, releaseId, projectId, teamId })
 )
 
 server.registerTool(
@@ -542,6 +532,11 @@ server.registerTool(
       ])
         .optional()
         .describe('Where the bug was found, defaults to "Manual QA"'),
+      releaseId: z.string()
+        .min(5)
+        .max(9)
+        .optional()
+        .describe('Optional Release ID to assign this bug to — if user gave a release name, resolve it via "get_current_releases" first'),
       projectId: z.string()
         .optional()
         .describe('Optional Project ID — if user gave a project name, resolve it via "get_projects" first; defaults to TP_PROJECT_ID from config'),
@@ -551,9 +546,6 @@ server.registerTool(
       entityStateId: z.string()
         .optional()
         .describe('Optional Entity State ID — if user gave a state name, resolve it via "get_bug_workflows" first; defaults to "Backlog"'),
-      releaseId: z.string()
-        .optional()
-        .describe('Optional Release ID to assign this bug to — if user gave a release name, resolve it via "get_current_releases" first'),
       tags: z.string()
         .optional()
         .describe('Optional comma-separated tags to apply, e.g. "regression, mobile"'),
@@ -565,8 +557,8 @@ server.registerTool(
         .describe('Optional TP user ID to assign as Developer on this bug — resolve via "get_logged_in_user" (to assign yourself) or "get_users" (to assign someone else by name) first'),
     },
   },
-  async ({ id, title, bugContent, origin, projectId, teamId, entityStateId, releaseId, tags, teamIterationId, developerId }) =>
-    handleUpdateBug(tp, { id, title, bugContent, origin, projectId, teamId, entityStateId, releaseId, tags, teamIterationId, developerId })
+  async ({ id, title, bugContent, origin, releaseId, projectId, teamId, entityStateId, tags, teamIterationId, developerId }) =>
+    handleUpdateBug(tp, { id, title, bugContent, origin, releaseId, projectId, teamId, entityStateId, tags, teamIterationId, developerId })
 )
 
 server.registerTool(
@@ -593,6 +585,62 @@ server.registerTool(
         .describe('Team Assignment ID, resolve it via "get_user_story_content" first'),
     },
   }, async ({ id, teamId, teamAssignmentId, entityStateId }) => handleUpdateUserStorySubState(tp, { id, teamId, teamAssignmentId, entityStateId }))
+
+server.registerTool(
+  'set_business_value',
+  {
+    title: 'Set Business Value on a TP card',
+    description: `Set the Business Value (Priority) on a Targetprocess User Story, Feature, or Epic.
+      Business Value in the TP UI maps to the Priority field in the API.
+      CRITICAL WORKFLOW: Call "get_priorities" first to retrieve the list of valid priority IDs and their names for this instance before calling this tool — do not guess priority IDs.`,
+    inputSchema: {
+      id: z.string()
+        .describe('ID of the card to update (e.g. "151282")'),
+      entityType: z.enum(['UserStories', 'Features', 'Epics'])
+        .describe('Entity type of the card'),
+      priorityId: z.string()
+        .describe('Priority ID — resolve via "get_priorities" first'),
+    },
+  },
+  async ({ id, entityType, priorityId }) => {
+    if (entityType === 'UserStories') {
+      const story = await tp.getUserStory<any>(id)
+      const featureId = story?.Feature?.Id
+      if (featureId) {
+        const siblings = await tp.getUserStoriesInFeatureWithPriority<any>(String(featureId))
+        const conflict = (siblings?.Items ?? []).find(
+          (s: any) => String(s.Id) !== String(id) && s.Priority?.Id === parseInt(priorityId)
+        )
+        if (conflict) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `Cannot set Business Value: story "${conflict.Name}" (${conflict.Id}) in the same feature already has this priority. Choose a different value.`,
+            }],
+          }
+        }
+      }
+    }
+    const response = await tp.setBusinessValue<any>({ id, entityType, priorityId })
+    if (response instanceof Error) {
+      return { content: [{ type: 'text' as const, text: `Failed to set business value on ${entityType} ${id}` }] }
+    }
+    return { content: [{ type: 'text' as const, text: JSON.stringify(response) }] }
+  }
+)
+
+server.registerTool(
+  'get_priorities',
+  {
+    title: 'Get available Business Value / Priority options',
+    description: `Returns the list of Priority options available in this Targetprocess instance. Use this before calling "set_business_value" to resolve a priority name (e.g. "Must Have", "Normal", "10") to its ID.`,
+    inputSchema: {},
+  },
+  async () => {
+    const response = await tp.getPriorities<any>()
+    return { content: [{ type: 'text' as const, text: JSON.stringify(response) }] }
+  }
+)
 
 server.registerTool(
   'update_user_story',
@@ -647,7 +695,7 @@ server.registerTool(
   async ({ id, title, description, projectId, teamId, entityStateId, featureId, releaseId, tags, teamIterationId, developerId }) => {
     const response = await tp.updateUserStory<any>({ id, title, description, projectId, teamId, entityStateId, featureId, releaseId, tags, teamIterationId });
 
-    if (!response) {
+    if (response instanceof Error) {
       return {
         content: [{
           type: 'text',
@@ -680,7 +728,8 @@ server.registerTool(
         1) format the new bug inside html <div> tags with Environment(describes where bug was found, dev, feature, review or uat Environment), Issue Description, Steps to Reproduce, Expected Behavior, Actual Behavior and Attachments sections (note: section titles should be wrapped in <h3> tags, e.g. <h3>Issue Description</h3>, step to reproduce should be wrapped in <ol>);
         2) IF the user specified a team by name (not ID), call "get_teams" to find the matching team and use its ID as teamId;
         3) IF the user specified a project by name (not ID), call "get_projects" to find the matching project and use its ID as projectId;
-        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;`,
+        4) IF the user specified a sprint/iteration by name, call "get_team_iterations" to find the matching iteration and use its ID as teamIterationId;
+        5) IF the user specified a release by name (not ID), call "get_current_releases" to find the matching release and use its ID as releaseId;`,
     inputSchema: {
       title: z.string()
         .describe('Bug card title that summarizes the problem in concise, descriptive, and actionable manner, enabling a developer to understand the issue without opening the report'),
@@ -699,6 +748,11 @@ server.registerTool(
       ])
         .optional()
         .describe('Where the bug was found. Omit if the project\'s Bug entity type has no Origin custom field (createBugOnly only sends this field when a value is given)'),
+      releaseId: z.string()
+        .min(5)
+        .max(9)
+        .optional()
+        .describe('Optional Release ID to assign this bug to — if user gave a release name, resolve it via "get_current_releases" first'),
       projectId: z.string()
         .optional()
         .describe('Optional Project ID — if user gave a project name, resolve it via "get_projects" first; defaults to TP_PROJECT_ID from config'),
@@ -716,8 +770,8 @@ server.registerTool(
         .describe('Optional Team Iteration (sprint) ID — resolve it via "get_team_iterations" first'),
     },
   },
-  async ({ title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId }) =>
-    handleCreateBug(tp, { title, bugContent, origin, projectId, teamId, entityStateId, tags, teamIterationId })
+  async ({ title, bugContent, origin, releaseId, projectId, teamId, entityStateId, tags, teamIterationId }) =>
+    handleCreateBug(tp, { title, bugContent, origin, releaseId, projectId, teamId, entityStateId, tags, teamIterationId })
 )
 
 server.registerTool(
@@ -983,7 +1037,7 @@ server.registerTool(
   'create_feature',
   {
     title: 'Create a new feature',
-    description: `Create a new Feature in Targetprocess.`,
+    description: `DEPRECATED — use "create_formatted_feature" instead for all new features. Only call this tool when you have a fully pre-written HTML description and the user has explicitly opted out of the structured template.`,
     inputSchema: {
       title: z.string()
         .describe('Feature title'),
@@ -1175,7 +1229,7 @@ server.registerTool(
   async ({ title, resourceId, resourceType, description }) => {
     const testPlanResponse = await tp.createTestPlan<TP.TestPlan>(title, resourceId, resourceType, { description });
 
-    if (!testPlanResponse) {
+    if (testPlanResponse instanceof Error) {
       return {
         content: [{
           type: 'text',
@@ -1208,7 +1262,7 @@ server.registerTool(
   async ({ id }) => {
     const response = await tp.getUserStoriesIdsByFeatureId<TP.TpResponseItemsV2<{ id: string }>>(id)
 
-    if (!response) {
+    if (response instanceof Error) {
       return {
         content: [{
           type: 'text',
@@ -1480,7 +1534,7 @@ server.registerTool(
   async ({ resourceId }) => {
     const userStoryResponse = await tp.getUserStoryTestPlan<TP.TpResponseV2<Record<"linkedTestPlan", TP.TpResultItemV2>>>(resourceId)
 
-    if (!userStoryResponse) {
+    if (userStoryResponse instanceof Error) {
       return {
         content: [{
           type: 'text',
@@ -1588,7 +1642,7 @@ server.registerTool(
       card = await tp.getUserStory<TP.UserStory>(resourceId)
     }
 
-    if (!card) {
+    if (card instanceof Error) {
       return {
         content: [{
           type: 'text',
@@ -1654,7 +1708,7 @@ server.registerTool(
 
     for (const tc of testCases) {
       const testCase = await tp.createTestCase<TP.TestCase>(tc.name, tc.description, String(testPlanId))
-      if (!testCase) {
+      if (testCase instanceof Error) {
         failed.push(tc.name)
         continue
       }
@@ -1663,10 +1717,10 @@ server.registerTool(
       let stepsFailed = 0
       for (const step of tc.steps) {
         const stepResult = await tp.addTestStep<TP.TestStep>(String(testCase.Id), step)
-        if (stepResult) {
-          stepsAdded++
-        } else {
+        if (stepResult instanceof Error) {
           stepsFailed++
+        } else {
+          stepsAdded++
         }
       }
 
