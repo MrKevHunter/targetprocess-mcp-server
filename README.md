@@ -40,6 +40,8 @@ Releases
 - `get_release_user_stories_with_description` — Same as above but includes full descriptions (name, withDescription)
 - `get_release_open_bugs` — Get only active/open bugs for a release (name, withDescription, optional results)
 - `get_release_open_user_stories` — Get only active/open user stories for a release (name, withDescription, optional results)
+- `create_release` — Create a new release (title, optional startDate, optional endDate, optional projectId)
+- `update_release` — Update a release's name, start date, end date, or project; pass only the fields to change (id, optional title, optional startDate, optional endDate, optional projectId)
 
 Features
 - `get_feature_content` — Get a Targetprocess Feature by ID, including description, state, and progress (id)
@@ -288,6 +290,8 @@ npx vitest            # watch mode
 | `get_logged_in_user.test.ts` | `get_logged_in_user` |
 | `get_user_by_id.test.ts` | `get_user_by_id` |
 | `release_tools.test.ts` | `get_release_user_stories`, `get_release_bugs`, `get_release_features`, `get_release_open_bugs`, `get_release_open_user_stories` |
+| `create_release.test.ts` | `create_release` |
+| `update_release.test.ts` | `update_release` |
 | `user_team_tools.test.ts` | `get_users`, `get_teams`, `get_teams_and_team_assignments` |
 | `comment_tools.test.ts` | `add_comment`, `get_user_story_comments`, `get_bug_comments` |
 | `creation_tools.test.ts` | `create_bug`, `create_user_story`, `create_feature`, `create_task`, `update_bug`, `update_user_story_state` |

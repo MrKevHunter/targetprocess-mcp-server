@@ -21,6 +21,8 @@ import { handleGetReleaseBugs } from "./handlers/get_release_bugs.js";
 import { handleGetReleaseFeatures } from "./handlers/get_release_features.js";
 import { handleGetReleaseOpenBugs } from "./handlers/get_release_open_bugs.js";
 import { handleGetReleaseOpenUserStories } from "./handlers/get_release_open_user_stories.js";
+import { handleCreateRelease } from "./handlers/create_release.js";
+import { handleUpdateRelease } from "./handlers/update_release.js";
 import { handleGetUsers } from "./handlers/get_users.js";
 import { handleGetTeams, handleGetTeamsAndTeamAssignments } from "./handlers/get_teams.js";
 import { handleGetTeamIterations } from "./handlers/get_team_iterations.js";
@@ -224,6 +226,57 @@ server.registerTool(
     },
   },
   async ({ name, results, withDescription }) => handleGetReleaseOpenUserStories(tp, name, results, withDescription)
+);
+
+server.registerTool(
+  'create_release',
+  {
+    title: 'Create a new release',
+    description: 'Create a new Targetprocess Release.',
+    inputSchema: {
+      title: z.string()
+        .describe('Release name'),
+      startDate: z.string()
+        .optional()
+        .describe('Optional start date, e.g. "2026-09-03"'),
+      endDate: z.string()
+        .optional()
+        .describe('Optional end date, e.g. "2026-09-03"'),
+      projectId: z.string()
+        .optional()
+        .describe('Optional Project ID — defaults to TP_PROJECT_ID from config'),
+    },
+  },
+  async ({ title, startDate, endDate, projectId }) =>
+    handleCreateRelease(tp, { title, startDate, endDate, projectId })
+);
+
+server.registerTool(
+  'update_release',
+  {
+    title: 'Update a release',
+    description: 'Update a Targetprocess Release. Pass only the fields to change.',
+    inputSchema: {
+      id: z.string()
+        .min(5)
+        .max(9)
+        .describe('Release ID (e.g. 58951) — resolve via "get_current_releases" if only given a name'),
+      title: z.string()
+        .optional()
+        .describe('Updated release name'),
+      startDate: z.string()
+        .optional()
+        .describe('Updated start date, e.g. "2026-09-03"'),
+      endDate: z.string()
+        .optional()
+        .describe('Updated end date, e.g. "2026-09-03"'),
+      projectId: z.string()
+        .optional()
+        .describe('Optional Project ID'),
+    },
+  },
+  async ({ id, title, startDate, endDate, projectId }) =>
+    handleUpdateRelease(tp, { id, title, startDate, endDate, projectId })
 );
 
 server.registerTool('search_tp_cards', {
