@@ -718,6 +718,35 @@ export class TpClient {
     }) as T
   }
 
+  async createRelease<T>({ title, startDate, endDate, projectId }: { title: string, startDate?: string, endDate?: string, projectId?: string }): Promise<T> {
+    const release: Record<string, any> = {
+      "Name": title,
+      "Project": { "Id": projectId || config.tp.projectId },
+    }
+
+    if (startDate) release["StartDate"] = startDate
+    if (endDate) release["EndDate"] = endDate
+
+    return this.post<any, T>({
+      pathParam: ["Releases"],
+      param: { "format": "json" },
+    }, release) as T
+  }
+
+  async updateRelease<T>({ id, title, startDate, endDate, projectId }: { id: string, title?: string, startDate?: string, endDate?: string, projectId?: string }): Promise<T> {
+    const release: Record<string, any> = { "Id": id }
+
+    if (title) release["Name"] = title
+    if (startDate) release["StartDate"] = startDate
+    if (endDate) release["EndDate"] = endDate
+    if (projectId) release["Project"] = { "Id": projectId }
+
+    return this.post<any, T>({
+      pathParam: ["Releases"],
+      param: { "format": "json" },
+    }, release) as T
+  }
+
   async getReleaseUserStories<T>({ name, results = 100, withDescription = false }: { name: string, results?: number, withDescription?: boolean }): Promise<T> {
     const includeFilter = withDescription ? "[Name, Description, Id]" : "[Name, Id]"
     return this.get<T>({
