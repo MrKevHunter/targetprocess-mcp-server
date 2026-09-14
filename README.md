@@ -82,6 +82,11 @@ Cards — Write
 - `update_user_story_state` — Update the sub-state (team assignment entity state) for a user story (id, optional entityStateId, optional teamId, optional teamAssignmentId)
   > 1. Call `get_user_story_content` first to find the assigned team and `teamAssignmentId`
   > 2. Call `get_user_story_workflows` to resolve the target state name → `entityStateId`
+- `set_business_value` — Set the Business Value (Priority) on a User Story, Feature, or Epic (id, entityType: UserStories | Features | Epics, priorityId)
+  > Resolve `priorityId` via `get_priorities` first — do not guess priority IDs
+- `get_priorities` — List the Priority options available in this instance, used to resolve a priority name (e.g. "Must Have") to its ID (no params)
+- `delete_card` — Delete a card by ID; works on Bugs, User Stories, Features, and Epics (id, type: Bug | UserStory | Feature | Epic)
+  > If the type is uncertain, resolve it first via `search_tp_cards` or by fetching the card
 - `create_bug` — Create a standalone bug (title, bugContent, optional origin, optional projectId, optional teamId, optional entityStateName)
   > `origin` accepted values: `Production - Customer`, `Production - Internal`, `Pre-Release - Customer`, `Pre-Release - Internal`, `Regression - Dev01`, `Regression - Team Env`, `Manual QA` *(default)*, `Developer Raised`, `Operations`
   > `entityStateName` accepted values: `Backlog`, `In Triage`, `Ready for Dev`, `In Dev`, `Blocked`, `PR Raised`, `Ready for Feature PCH`, `Ready for Feature QA`, `In Feature QA`, `Failed Feature QA`, `Ready for Merge`, `Ready to Deploy to Dev01`, `Ready for Dev01 QA`, `In Dev01 QA`, `Failed Dev01 QA`, `Ready to Deploy to prod`, `Closed`
@@ -96,12 +101,11 @@ Cards — Write
 - `create_formatted_user_story` — Create a new user story with a structured template description in Header → Definitions → Scenarios → Examples Table → Edge Cases → Acceptance Criteria → References → Notes order (title, header object with asA/iWant/soThat, scenarios array with Gherkin steps, acceptanceCriteria array, optional definitions, examplesTable, edgeCases, references, notes, optional featureId, releaseId, projectId, teamId)  
 > [!NOTE]  
 > `projectId` and `teamId` are optional — fall back to `TP_PROJECT_ID` and `TP_TEAM_ID` from config  
-- `format_existing_user_story` — Re-format the description of an existing user story using the structured template (id, header object with asA/iWant/soThat, acceptanceCriteria array, scenarios array with Gherkin steps, optional title, definitions, examplesTable, edgeCases, references, notes)
-  > Call `get_user_story_content` first to read the current content, then reconstruct the structured fields before calling this tool
+- `create_epic` — Create a new epic (title, optional description, optional releaseId, optional projectId)
 - `get_epic_content` — Get a Targetprocess Epic by ID, including description, state, and progress (id)
 - `update_epic` — Update an epic's title, description, release, or project (id, optional title, optional description, optional releaseId, optional projectId)
 - `get_epic_features` — Get all features belonging to an epic (id)
-- `create_feature` — Create a new feature (title, optional description, optional epicId, optional releaseId, optional projectId, optional teamId)  
+- `create_feature` — **DEPRECATED**, use `create_formatted_feature` instead for all new features; only call this when you have a fully pre-written HTML description and the user has explicitly opted out of the structured template (title, optional description, optional epicId, optional releaseId, optional projectId, optional teamId)  
 > [!NOTE]  
 > `projectId` and `teamId` are optional — fall back to `TP_PROJECT_ID` and `TP_TEAM_ID` from config  
 - `create_formatted_feature` — Create a new feature with a feature-level TDRE template in Header → Definitions → Scope & Boundaries → Non-Functional Requirements → Cross-Cutting Scenarios → Child Stories → Open Questions/Risks → References → Notes order (title, header object with businessBackground, nonFunctionalRequirements array with area/requirement/status/storyOrOwner, optional definitions, scope, crossCuttingScenarios, childStories, openQuestions, references, notes, optional epicId, releaseId, projectId, teamId)  
@@ -134,6 +138,7 @@ Projects
 Teams
 - `get_teams` — Get all Targetprocess teams returning id and name (no params needed)
 - `get_teams_and_team_assignments` — Get all teams and team assignments (id and name for each) (no params needed)
+- `get_team_iterations` — Get team iterations (sprints), optionally filtered by team; used to resolve a sprint/iteration name to an ID (optional teamId)
 
 User
 - `get_logged_in_user` — Get the currently logged-in user's info (no params needed)
@@ -154,6 +159,7 @@ Developer Tools
   > Format for task on a user story: `F#<featureId> US#<userStoryId> T#<taskId> <title>`
   > Format for bug on a user story: `F#<featureId> US#<userStoryId> B#<bugId> <title>`
   > Format for standalone bug: `B#<bugId> <title>`
+- `get_version` — Returns the current version of the MCP server from package.json (no params needed)
 
 
 ---
