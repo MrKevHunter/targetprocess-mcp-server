@@ -1,0 +1,43 @@
+name: Publish Docker image
+
+# Builds a prebuilt image (deps installed, TypeScript already compiled) and
+# pushes it to GHCR so MCP clients (e.g. gh-aw) can start the server
+# instantly instead of running `npx github:...` on every cold start.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "Dockerfile"
+      - ".github/workflows/docker-publish.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/targetprocess-mcp-server:latest
+            ghcr.io/${{ github.repository_owner }}/targetprocess-mcp-server:${{ github.sha }}
