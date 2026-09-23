@@ -2,13 +2,14 @@
   "name": "targetprocess-mcp-server",
   "type": "module",
   "bin": "./build/index.js",
-  "scripts": {
-    "prebuild": "rimraf build dist",
-    "build": "tsc",
-    "postbuild": "node chmod.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
+ "scripts": {
+  "prebuild": "rimraf build dist",
+  "build": "tsc",
+  "postbuild": "node chmod.js",
+  "prepare": "npm run build",
+  "test": "vitest run",
+  "test:watch": "vitest"
+},
   "files": [
     "build"
   ],
