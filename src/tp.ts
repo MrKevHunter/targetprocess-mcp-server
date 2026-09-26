@@ -189,6 +189,28 @@ export class TpClient {
     }
   }
 
+  // Like getAllOrNull(), but follows the TpResult<T> contract: pages through
+  // take/skip and the Next cursor, returning a flattened list, or the first
+  // page's failure if any page comes back !ok.
+  private async getAllRaw<T>(params: TpClientParameters): Promise<TpResult<T[]>> {
+    const allItems: T[] = []
+    let skip = 0
+    const take = 100
+
+    while (true) {
+      const page = await this.getRaw<TpResponse<T>>({
+        ...params,
+        param: { ...params.param, take, skip },
+      })
+      if (!page.ok) return page
+      allItems.push(...(page.data.Items || []))
+      if (!page.data.Next) break
+      skip += take
+    }
+
+    return { ok: true, data: allItems }
+  }
+
   private async getAllOrNull<T>(params: TpClientParameters): Promise<T[] | null> {
     const allItems: T[] = []
     let skip = 0
@@ -1413,14 +1435,13 @@ export class TpClient {
   }
 
 
-  async listAttachments<T>(generalId: string): Promise<TpResult<T>> {
-    return this.getRaw<T>({
+  async listAttachments<T>(generalId: string): Promise<TpResult<T[]>> {
+    return this.getAllRaw<T>({
       pathParam: ["Attachments"],
       param: {
         "format": "json",
         "where": `(General.Id eq ${generalId})`,
         "include": "[Id,Name,Description,Date,MimeType,Uri,ThumbnailUri,Size,Owner[FirstName,LastName],General[Id,Name,EntityType]]",
-        "take": 1000,
       },
     })
   }
@@ -1449,25 +1470,25 @@ export class TpClient {
   // opaque text for logging only; callers must not parse it as structured
   // data - a real upload is confirmed by re-listing the card's attachments.
   async uploadAttachment(generalId: string, source: { filePath: string } | { fileContent: string; fileName: string }, mimeType?: string): Promise<TpResult<string>> {
-    let blob: Blob
-    let fileName: string
-
-    if ("filePath" in source) {
-      blob = new Blob([readFileSync(source.filePath)], mimeType ? { type: mimeType } : undefined)
-      fileName = basename(source.filePath)
-    } else {
-      blob = new Blob([Buffer.from(source.fileContent, "base64")], mimeType ? { type: mimeType } : undefined)
-      fileName = source.fileName
-    }
-
-    const formData = new FormData()
-    formData.append("generalId", generalId)
-    formData.append("file", blob, fileName)
-
-    const url = `${this.baseUrl}/UploadFile.ashx?access_token=${this.token}`
-    console.error(JSON.stringify({ "TP_UPLOAD_URL": this.redact(url) }))
-
     try {
+      let blob: Blob
+      let fileName: string
+
+      if ("filePath" in source) {
+        blob = new Blob([readFileSync(source.filePath)], mimeType ? { type: mimeType } : undefined)
+        fileName = basename(source.filePath)
+      } else {
+        blob = new Blob([Buffer.from(source.fileContent, "base64")], mimeType ? { type: mimeType } : undefined)
+        fileName = source.fileName
+      }
+
+      const formData = new FormData()
+      formData.append("generalId", generalId)
+      formData.append("file", blob, fileName)
+
+      const url = `${this.baseUrl}/UploadFile.ashx?access_token=${this.token}`
+      console.error(JSON.stringify({ "TP_UPLOAD_URL": this.redact(url) }))
+
       const response = await fetch(url, {
         method: "POST",
         body: formData,
@@ -1486,13 +1507,23 @@ export class TpClient {
 
   // Downloads an attachment's binary content from its `Uri` (as returned by
   // listAttachments/getAttachment). Uris may be relative (rooted at baseUrl)
-  // or absolute; access_token is appended only if not already present.
+  // or absolute; access_token is appended only if not already present, and
+  // only for a same-origin URL - never send the credential to a Uri on
+  // another host, in case an attachment record is malformed or malicious.
   // Distinct from get()/getRaw() because the response isn't JSON.
   async downloadAttachmentContent(uri: string): Promise<TpResult<{ data: Buffer; mimeType: string; size: number }>> {
     const isAbsolute = /^https?:\/\//i.test(uri)
-    const hasToken = /[?&]access_token=/i.test(uri)
     let url = isAbsolute ? uri : `${this.baseUrl}${uri.startsWith("/") ? "" : "/"}${uri}`
-    if (!hasToken) {
+
+    let sameOrigin: boolean
+    try {
+      sameOrigin = new URL(url).origin === new URL(this.baseUrl).origin
+    } catch (error) {
+      return { ok: false, status: 0, body: `Invalid attachment uri: ${String(error)}` }
+    }
+
+    const hasToken = /[?&]access_token=/i.test(url)
+    if (!hasToken && sameOrigin) {
       url += `${url.includes("?") ? "&" : "?"}access_token=${this.token}`
     }
 

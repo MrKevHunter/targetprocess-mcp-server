@@ -53,7 +53,7 @@ export async function handleAddAttachment(
     displayName = params.fileName!
   }
 
-  const before = await tp.listAttachments<TP.TpResponse<TP.Attachment>>(params.generalId)
+  const before = await tp.listAttachments<TP.Attachment>(params.generalId)
   if (!before.ok) {
     return {
       content: [{
@@ -63,7 +63,7 @@ export async function handleAddAttachment(
       }],
     }
   }
-  const beforeIds = new Set(before.data.Items.map((a) => a.Id))
+  const beforeIds = new Set(before.data.map((a) => a.Id))
 
   const uploadResult = await tp.uploadAttachment(params.generalId, source, params.mimeType)
   if (!uploadResult.ok) {
@@ -80,7 +80,7 @@ export async function handleAddAttachment(
   // shape on every TP instance, so a 200 only means "accepted" - confirm
   // the file actually persisted by re-listing and diffing against what
   // existed before the upload.
-  const after = await tp.listAttachments<TP.TpResponse<TP.Attachment>>(params.generalId)
+  const after = await tp.listAttachments<TP.Attachment>(params.generalId)
   if (!after.ok) {
     return {
       content: [{
@@ -91,7 +91,7 @@ export async function handleAddAttachment(
     }
   }
 
-  const newItems = after.data.Items.filter((a) => !beforeIds.has(a.Id))
+  const newItems = after.data.filter((a) => !beforeIds.has(a.Id))
   const match = newItems.find((a) => a.Name === displayName)
 
   if (!match) {

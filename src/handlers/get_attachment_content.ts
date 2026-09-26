@@ -45,6 +45,19 @@ export async function handleGetAttachmentContent(tp: TpClient, params: { attachm
     }
   }
 
+  // Only images ever get inlined, so don't spend the download (bandwidth,
+  // and the "content download failed" fallback message below, which is
+  // misleading when we never needed the content anyway) on a type that was
+  // never going to be inlined in the first place.
+  if (!(attachment.MimeType || '').startsWith('image/')) {
+    return {
+      content: [{
+        type: 'text' as const,
+        text: metadataText(attachment, 'Only image/* attachments are inlined as image content. Metadata returned instead.'),
+      }],
+    }
+  }
+
   const contentResult = await tp.downloadAttachmentContent(attachment.Uri)
 
   if (!contentResult.ok) {
@@ -70,27 +83,26 @@ export async function handleGetAttachmentContent(tp: TpClient, params: { attachm
     }
   }
 
-  // Trust the downloaded content-type over the metadata's MimeType, unless
-  // it's a generic binary type - that guards against e.g. an auth redirect
-  // (HTTP 200 with an HTML login page) being mistaken for the real image.
+  // We only get here when the metadata already said image/*. Trust the
+  // downloaded content-type over that metadata, unless it's a generic
+  // binary type - that guards against e.g. an auth redirect (HTTP 200 with
+  // an HTML login page) being mistaken for the real image.
   const isGenericBinary = !downloadedMimeType || GENERIC_BINARY_MIME_TYPES.has(downloadedMimeType.toLowerCase())
   const effectiveMimeType = isGenericBinary ? attachment.MimeType : downloadedMimeType
-  const isImage = (effectiveMimeType || '').startsWith('image/')
 
-  if (isImage) {
+  if ((effectiveMimeType || '').startsWith('image/')) {
     return {
       content: [{ type: 'image' as const, data: data.toString('base64'), mimeType: effectiveMimeType }],
     }
   }
 
-  const note = !isGenericBinary && (attachment.MimeType || '').startsWith('image/')
-    ? `Downloaded content-type was "${downloadedMimeType}", not an image - this may be an authentication redirect rather than the actual file. Open "uri" directly in a browser instead.`
-    : 'Only image/* attachments are inlined as image content. Metadata returned instead.'
-
   return {
     content: [{
       type: 'text' as const,
-      text: metadataText({ ...attachment, MimeType: effectiveMimeType, Size: size }, note),
+      text: metadataText(
+        { ...attachment, MimeType: effectiveMimeType, Size: size },
+        `Downloaded content-type was "${downloadedMimeType}", not an image - this may be an authentication redirect rather than the actual file. Open "uri" directly in a browser instead.`,
+      ),
     }],
   }
 }

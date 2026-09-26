@@ -37,18 +37,15 @@ describe('handleGetAttachmentContent', () => {
     expect((result.content[0] as any).data).toBe(Buffer.from('fake-bytes').toString('base64'))
   })
 
-  it('returns metadata text for a non-image mime type', async () => {
+  it('returns metadata text for a non-image mime type without downloading content', async () => {
     vi.mocked(mockTp.getAttachment).mockResolvedValue({ ok: true, data: attachment({ MimeType: 'application/pdf', Size: 10 }) } as any)
-    vi.mocked(mockTp.downloadAttachmentContent).mockResolvedValue({
-      ok: true,
-      data: { data: Buffer.from('fake-bytes'), mimeType: 'application/pdf', size: 10 },
-    } as any)
 
     const result = await handleGetAttachmentContent(mockTp, { attachmentId: '20748' })
     const parsed = JSON.parse(result.content[0].text)
 
     expect(result.content[0].type).toBe('text')
     expect(parsed.note).toContain('Only image/* attachments are inlined')
+    expect(mockTp.downloadAttachmentContent).not.toHaveBeenCalled()
   })
 
   it('skips downloading when metadata Size exceeds the inline limit', async () => {

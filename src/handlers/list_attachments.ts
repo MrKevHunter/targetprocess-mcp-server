@@ -2,7 +2,7 @@ import type { TpClient } from '../tp.js'
 import type * as TP from '../types.js'
 
 export async function handleListAttachments(tp: TpClient, params: { generalId: string }) {
-  const result = await tp.listAttachments<TP.TpResponse<TP.Attachment>>(params.generalId)
+  const result = await tp.listAttachments<TP.Attachment>(params.generalId)
 
   if (!result.ok) {
     return {
@@ -14,5 +14,5 @@ export async function handleListAttachments(tp: TpClient, params: { generalId: s
     }
   }
 
-  return { content: [{ type: 'text' as const, text: JSON.stringify(result.data.Items) }] }
+  return { content: [{ type: 'text' as const, text: JSON.stringify(result.data) }] }
 }

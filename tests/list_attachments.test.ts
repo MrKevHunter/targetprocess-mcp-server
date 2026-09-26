@@ -15,7 +15,7 @@ describe('handleListAttachments', () => {
     const items = [{ Id: 1, Name: 'a.png' }, { Id: 2, Name: 'b.png' }]
     vi.mocked(mockTp.listAttachments).mockResolvedValue({
       ok: true,
-      data: { Next: '', Items: items },
+      data: items,
     } as any)
 
     const result = await handleListAttachments(mockTp, { generalId: '148980' })
@@ -28,7 +28,7 @@ describe('handleListAttachments', () => {
   it('returns an empty array when there are no attachments', async () => {
     vi.mocked(mockTp.listAttachments).mockResolvedValue({
       ok: true,
-      data: { Next: '', Items: [] },
+      data: [],
     } as any)
 
     const result = await handleListAttachments(mockTp, { generalId: '148980' })

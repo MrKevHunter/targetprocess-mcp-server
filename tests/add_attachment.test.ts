@@ -18,8 +18,8 @@ beforeEach(() => {
 describe('handleAddAttachment', () => {
   it('uploads via fileContent and confirms via the before/after diff', async () => {
     vi.mocked(mockTp.listAttachments)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 1, Name: 'old.png' }] } } as any)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 1, Name: 'old.png' }, { Id: 2, Name: 'new.png' }] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 1, Name: 'old.png' }] } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 1, Name: 'old.png' }, { Id: 2, Name: 'new.png' }] } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
 
     const result = await handleAddAttachment(mockTp, { generalId: '148980', fileContent: 'aGk=', fileName: 'new.png' })
@@ -32,8 +32,8 @@ describe('handleAddAttachment', () => {
   it('uploads via filePath, matching the uploaded attachment by basename', async () => {
     vi.mocked(statSync).mockReturnValue({ size: 1024 } as any)
     vi.mocked(mockTp.listAttachments)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [] } } as any)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 5, Name: 'shot.png' }] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: [] } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 5, Name: 'shot.png' }] } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
 
     const result = await handleAddAttachment(mockTp, { generalId: '148980', filePath: '/tmp/shot.png' })
@@ -65,8 +65,8 @@ describe('handleAddAttachment', () => {
   it('does not confirm an unrelated attachment that appears concurrently', async () => {
     vi.mocked(statSync).mockReturnValue({ size: 1024 } as any)
     vi.mocked(mockTp.listAttachments)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [] } } as any)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 9, Name: 'someone-elses-upload.png' }] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: [] } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 9, Name: 'someone-elses-upload.png' }] } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
 
     const result = await handleAddAttachment(mockTp, { generalId: '148980', filePath: '/tmp/shot.png' })
@@ -106,7 +106,7 @@ describe('handleAddAttachment', () => {
   })
 
   it('surfaces HTTP status and response body when the upload fails', async () => {
-    vi.mocked(mockTp.listAttachments).mockResolvedValue({ ok: true, data: { Next: '', Items: [] } } as any)
+    vi.mocked(mockTp.listAttachments).mockResolvedValue({ ok: true, data: [] } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: false, status: 500, body: 'boom' } as any)
 
     const result = await handleAddAttachment(mockTp, { generalId: '148980', fileContent: 'aGk=', fileName: 'new.png' })
@@ -117,8 +117,8 @@ describe('handleAddAttachment', () => {
 
   it('reports when the upload succeeds but no new attachment appears afterward', async () => {
     vi.mocked(mockTp.listAttachments)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 1, Name: 'old.png' }] } } as any)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 1, Name: 'old.png' }] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 1, Name: 'old.png' }] } as any)
+      .mockResolvedValueOnce({ ok: true, data: [{ Id: 1, Name: 'old.png' }] } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
 
     const result = await handleAddAttachment(mockTp, { generalId: '148980', fileContent: 'aGk=', fileName: 'new.png' })
@@ -137,7 +137,7 @@ describe('handleAddAttachment', () => {
 
   it('reports when the post-upload listAttachments call fails', async () => {
     vi.mocked(mockTp.listAttachments)
-      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: [] } as any)
       .mockResolvedValueOnce({ ok: false, status: 500, body: 'boom' } as any)
     vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
 
