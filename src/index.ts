@@ -57,6 +57,10 @@ import { handleGetCardRelations } from "./handlers/get_card_relations.js";
 import { handleCreateCardRelation } from "./handlers/create_card_relation.js";
 import { handleDeleteCardRelation } from "./handlers/delete_card_relation.js";
 import { handleDeleteCard } from "./handlers/delete_card.js";
+import { handleAddAttachment } from "./handlers/add_attachment.js";
+import { handleListAttachments } from "./handlers/list_attachments.js";
+import { handleGetAttachmentContent } from "./handlers/get_attachment_content.js";
+import { handleDeleteAttachment } from "./handlers/delete_attachment.js";
 import { handleGetTestPlanById } from "./handlers/get_test_plan_by_id.js";
 import { handleGetTestPlanTestCasesById } from "./handlers/get_test_plan_test_cases_by_id.js";
 import { handleGetTestPlanTestCasesWithStepsById } from "./handlers/get_test_plan_test_cases_with_steps_by_id.js";
@@ -1926,6 +1930,61 @@ server.registerTool(
     },
   },
   async ({ id, type }) => handleDeleteCard(tp, { id, type })
+)
+
+server.registerTool(
+  'add_attachment',
+  {
+    title: 'Add an attachment to a card',
+    description: `Upload a file (e.g. a screenshot or image) as an attachment to a Targetprocess card (Bug, UserStory, Feature, etc.) identified by its General id.
+      Provide exactly one of "filePath" (a path readable by this MCP server process) or "fileContent" (base64-encoded content, requires "fileName").
+      Limited to files <= 10 MB. After upload, this tool confirms the file persisted by re-listing the card's attachments and returns the new attachment's metadata.`,
+    inputSchema: {
+      generalId: z.string().describe('The card ID (General.Id) to attach the file to, e.g. 148980'),
+      filePath: z.string().optional().describe('Path to a file on disk, readable by this server process'),
+      fileContent: z.string().optional().describe('Base64-encoded file content (use with fileName)'),
+      fileName: z.string().optional().describe('File name including extension, e.g. "screenshot.png" (required with fileContent)'),
+      mimeType: z.string().optional().describe('MIME type of the file, e.g. "image/png" (best-effort hint)'),
+    },
+  },
+  async ({ generalId, filePath, fileContent, fileName, mimeType }) => handleAddAttachment(tp, { generalId, filePath, fileContent, fileName, mimeType })
+)
+
+server.registerTool(
+  'list_attachments',
+  {
+    title: 'List attachments on a card',
+    description: 'List all attachments (id, name, mime type, size, uri, owner) for a Targetprocess card by its General id.',
+    inputSchema: {
+      generalId: z.string().describe('The card ID (General.Id) to list attachments for, e.g. 148980'),
+    },
+  },
+  async ({ generalId }) => handleListAttachments(tp, { generalId })
+)
+
+server.registerTool(
+  'get_attachment_content',
+  {
+    title: 'Get attachment content',
+    description: `Fetch a single attachment's metadata and content by its attachment id (from "list_attachments").
+      Images (mimeType starting with "image/") up to 5 MB are inlined as an image content block; larger files or non-image types return metadata plus the attachment's "uri" instead.`,
+    inputSchema: {
+      attachmentId: z.string().describe('The attachment ID (the "Id" field from "list_attachments"), e.g. 20748'),
+    },
+  },
+  async ({ attachmentId }) => handleGetAttachmentContent(tp, { attachmentId })
+)
+
+server.registerTool(
+  'delete_attachment',
+  {
+    title: 'Delete an attachment',
+    description: 'Delete an attachment from Targetprocess by its attachment id (from "list_attachments").',
+    inputSchema: {
+      attachmentId: z.string().describe('The attachment ID to delete, e.g. 20748'),
+    },
+  },
+  async ({ attachmentId }) => handleDeleteAttachment(tp, { attachmentId })
 )
 
 server.registerTool(

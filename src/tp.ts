@@ -165,6 +165,30 @@ export class TpClient {
     }
   }
 
+  // Like get(), but on failure returns the HTTP status and raw response body
+  // instead of an Error instance, so callers can use the same TpResult<T>
+  // contract as postRaw()/del().
+  private async getRaw<T>(params: TpClientParameters): Promise<TpResult<T>> {
+    params.param["access_token"] = this.token
+    let _url = this.params(params)
+    console.error(JSON.stringify({ "TP_GET_URL": this.redact(_url) }))
+    try {
+      const response = await fetch(_url, {
+        method: "GET",
+        headers: this.headers
+      });
+      const text = await response.text()
+      if (!response.ok) {
+        console.error(JSON.stringify({ "TP_GET_ERROR_STATUS": response.status, "TP_GET_ERROR_BODY": text }))
+        return { ok: false, status: response.status, body: text }
+      }
+      return { ok: true, data: (text ? JSON.parse(text) : null) as T }
+    } catch (error) {
+      console.error("Error making TP request:", error);
+      return { ok: false, status: 0, body: String(error) }
+    }
+  }
+
   private async getAllOrNull<T>(params: TpClientParameters): Promise<T[] | null> {
     const allItems: T[] = []
     let skip = 0
@@ -1389,15 +1413,50 @@ export class TpClient {
   }
 
 
-  async addAttachedFile(generalId: string, source: { filePath: string } | { fileContent: string; fileName: string }): Promise<string | null> {
+  async listAttachments<T>(generalId: string): Promise<TpResult<T>> {
+    return this.getRaw<T>({
+      pathParam: ["Attachments"],
+      param: {
+        "format": "json",
+        "where": `(General.Id eq ${generalId})`,
+        "include": "[Id,Name,Description,Date,MimeType,Uri,ThumbnailUri,Size,Owner[FirstName,LastName],General[Id,Name,EntityType]]",
+        "take": 1000,
+      },
+    })
+  }
+
+  async getAttachment<T>(attachmentId: string): Promise<TpResult<T>> {
+    return this.getRaw<T>({
+      pathParam: ["Attachments", attachmentId],
+      param: {
+        "format": "json",
+        "include": "[Id,Name,Description,Date,MimeType,Uri,ThumbnailUri,Size,Owner[FirstName,LastName],General[Id,Name,EntityType]]",
+      },
+    })
+  }
+
+  async deleteAttachment<T>(attachmentId: string): Promise<TpResult<T>> {
+    return this.del<T>({
+      pathParam: ["Attachments", attachmentId],
+      param: { "format": "json" },
+    })
+  }
+
+  // Uploads a file to a card via UploadFile.ashx (outside /api/v1 - a
+  // different base path, multipart body, no JSON-only response guarantee -
+  // so it can't go through get()/post()/postRaw()). The response body's
+  // shape isn't a documented/verified contract, so `data` is returned as
+  // opaque text for logging only; callers must not parse it as structured
+  // data - a real upload is confirmed by re-listing the card's attachments.
+  async uploadAttachment(generalId: string, source: { filePath: string } | { fileContent: string; fileName: string }, mimeType?: string): Promise<TpResult<string>> {
     let blob: Blob
     let fileName: string
 
     if ("filePath" in source) {
-      blob = new Blob([readFileSync(source.filePath)])
+      blob = new Blob([readFileSync(source.filePath)], mimeType ? { type: mimeType } : undefined)
       fileName = basename(source.filePath)
     } else {
-      blob = new Blob([Buffer.from(source.fileContent, "base64")])
+      blob = new Blob([Buffer.from(source.fileContent, "base64")], mimeType ? { type: mimeType } : undefined)
       fileName = source.fileName
     }
 
@@ -1406,20 +1465,53 @@ export class TpClient {
     formData.append("file", blob, fileName)
 
     const url = `${this.baseUrl}/UploadFile.ashx?access_token=${this.token}`
-    console.error(JSON.stringify({ "UPLOAD_URL": this.redact(url) }, null, 2))
+    console.error(JSON.stringify({ "TP_UPLOAD_URL": this.redact(url) }))
 
     try {
       const response = await fetch(url, {
         method: "POST",
         body: formData,
       })
+      const text = await response.text()
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        console.error(JSON.stringify({ "TP_UPLOAD_ERROR_STATUS": response.status, "TP_UPLOAD_ERROR_BODY": text }))
+        return { ok: false, status: response.status, body: text }
       }
-      return await response.text()
+      return { ok: true, data: text }
     } catch (error) {
-      console.error("Error uploading file:", error)
-      return null
+      console.error("Error uploading attachment:", error)
+      return { ok: false, status: 0, body: String(error) }
+    }
+  }
+
+  // Downloads an attachment's binary content from its `Uri` (as returned by
+  // listAttachments/getAttachment). Uris may be relative (rooted at baseUrl)
+  // or absolute; access_token is appended only if not already present.
+  // Distinct from get()/getRaw() because the response isn't JSON.
+  async downloadAttachmentContent(uri: string): Promise<TpResult<{ data: Buffer; mimeType: string; size: number }>> {
+    const isAbsolute = /^https?:\/\//i.test(uri)
+    const hasToken = /[?&]access_token=/i.test(uri)
+    let url = isAbsolute ? uri : `${this.baseUrl}${uri.startsWith("/") ? "" : "/"}${uri}`
+    if (!hasToken) {
+      url += `${url.includes("?") ? "&" : "?"}access_token=${this.token}`
+    }
+
+    console.error(JSON.stringify({ "TP_DOWNLOAD_URL": this.redact(url) }))
+
+    try {
+      const response = await fetch(url, { method: "GET" })
+      if (!response.ok) {
+        const text = await response.text().catch(() => "")
+        console.error(JSON.stringify({ "TP_DOWNLOAD_ERROR_STATUS": response.status, "TP_DOWNLOAD_ERROR_BODY": text }))
+        return { ok: false, status: response.status, body: text }
+      }
+      const arrayBuffer = await response.arrayBuffer()
+      const data = Buffer.from(arrayBuffer)
+      const mimeType = response.headers.get("content-type") || "application/octet-stream"
+      return { ok: true, data: { data, mimeType, size: data.byteLength } }
+    } catch (error) {
+      console.error("Error downloading attachment content:", error)
+      return { ok: false, status: 0, body: String(error) }
     }
   }
 }
