@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('fs', () => ({ statSync: vi.fn() }))
+
+import { statSync } from 'fs'
 import { handleAddAttachment } from '../src/handlers/add_attachment.js'
 import type { TpClient } from '../src/tp.js'
 
@@ -25,7 +29,8 @@ describe('handleAddAttachment', () => {
     expect(mockTp.uploadAttachment).toHaveBeenCalledWith('148980', { fileContent: 'aGk=', fileName: 'new.png' }, undefined)
   })
 
-  it('uploads via filePath', async () => {
+  it('uploads via filePath, matching the uploaded attachment by basename', async () => {
+    vi.mocked(statSync).mockReturnValue({ size: 1024 } as any)
     vi.mocked(mockTp.listAttachments)
       .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [] } } as any)
       .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 5, Name: 'shot.png' }] } } as any)
@@ -36,6 +41,37 @@ describe('handleAddAttachment', () => {
 
     expect(parsed).toEqual({ Id: 5, Name: 'shot.png' })
     expect(mockTp.uploadAttachment).toHaveBeenCalledWith('148980', { filePath: '/tmp/shot.png' }, undefined)
+  })
+
+  it('rejects a filePath over the size limit without reading or uploading it', async () => {
+    vi.mocked(statSync).mockReturnValue({ size: 11 * 1024 * 1024 } as any)
+
+    const result = await handleAddAttachment(mockTp, { generalId: '148980', filePath: '/tmp/huge.png' })
+
+    expect(result.content[0].text).toContain('exceeds the')
+    expect(mockTp.uploadAttachment).not.toHaveBeenCalled()
+    expect(mockTp.listAttachments).not.toHaveBeenCalled()
+  })
+
+  it('reports an error when the filePath cannot be read', async () => {
+    vi.mocked(statSync).mockImplementation(() => { throw new Error('ENOENT: no such file') })
+
+    const result = await handleAddAttachment(mockTp, { generalId: '148980', filePath: '/tmp/missing.png' })
+
+    expect(result.content[0].text).toContain('Could not read "/tmp/missing.png"')
+    expect(mockTp.uploadAttachment).not.toHaveBeenCalled()
+  })
+
+  it('does not confirm an unrelated attachment that appears concurrently', async () => {
+    vi.mocked(statSync).mockReturnValue({ size: 1024 } as any)
+    vi.mocked(mockTp.listAttachments)
+      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [] } } as any)
+      .mockResolvedValueOnce({ ok: true, data: { Next: '', Items: [{ Id: 9, Name: 'someone-elses-upload.png' }] } } as any)
+    vi.mocked(mockTp.uploadAttachment).mockResolvedValue({ ok: true, data: 'ok' } as any)
+
+    const result = await handleAddAttachment(mockTp, { generalId: '148980', filePath: '/tmp/shot.png' })
+
+    expect(result.content[0].text).toContain('may not have persisted')
   })
 
   it('rejects when neither filePath nor fileContent is given', async () => {

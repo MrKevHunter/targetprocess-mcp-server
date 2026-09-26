@@ -5,6 +5,11 @@ import type * as TP from '../types.js'
 // the conversation's context budget - cap what gets inlined.
 const MAX_INLINE_BYTES = 5 * 1024 * 1024 // 5 MB
 
+// Some TP instances serve binary downloads with a generic content-type
+// instead of the real one - in that case trust the attachment's own
+// MimeType rather than treating it as "not an image".
+const GENERIC_BINARY_MIME_TYPES = new Set(['application/octet-stream', 'binary/octet-stream'])
+
 function metadataText(attachment: TP.Attachment, note: string) {
   return JSON.stringify({
     id: attachment.Id,
@@ -30,7 +35,6 @@ export async function handleGetAttachmentContent(tp: TpClient, params: { attachm
   }
 
   const attachment = metaResult.data
-  const isImage = (attachment.MimeType || '').startsWith('image/')
 
   if (attachment.Size > MAX_INLINE_BYTES) {
     return {
@@ -55,27 +59,38 @@ export async function handleGetAttachmentContent(tp: TpClient, params: { attachm
     }
   }
 
-  const { data, mimeType, size } = contentResult.data
+  const { data, mimeType: downloadedMimeType, size } = contentResult.data
 
   if (size > MAX_INLINE_BYTES) {
     return {
       content: [{
         type: 'text' as const,
-        text: metadataText({ ...attachment, MimeType: mimeType, Size: size }, `Downloaded content is ${size} bytes, over the ${MAX_INLINE_BYTES} byte inline limit. Not inlined.`),
+        text: metadataText({ ...attachment, MimeType: downloadedMimeType, Size: size }, `Downloaded content is ${size} bytes, over the ${MAX_INLINE_BYTES} byte inline limit. Not inlined.`),
       }],
     }
   }
 
+  // Trust the downloaded content-type over the metadata's MimeType, unless
+  // it's a generic binary type - that guards against e.g. an auth redirect
+  // (HTTP 200 with an HTML login page) being mistaken for the real image.
+  const isGenericBinary = !downloadedMimeType || GENERIC_BINARY_MIME_TYPES.has(downloadedMimeType.toLowerCase())
+  const effectiveMimeType = isGenericBinary ? attachment.MimeType : downloadedMimeType
+  const isImage = (effectiveMimeType || '').startsWith('image/')
+
   if (isImage) {
     return {
-      content: [{ type: 'image' as const, data: data.toString('base64'), mimeType: mimeType || attachment.MimeType }],
+      content: [{ type: 'image' as const, data: data.toString('base64'), mimeType: effectiveMimeType }],
     }
   }
+
+  const note = !isGenericBinary && (attachment.MimeType || '').startsWith('image/')
+    ? `Downloaded content-type was "${downloadedMimeType}", not an image - this may be an authentication redirect rather than the actual file. Open "uri" directly in a browser instead.`
+    : 'Only image/* attachments are inlined as image content. Metadata returned instead.'
 
   return {
     content: [{
       type: 'text' as const,
-      text: metadataText({ ...attachment, MimeType: mimeType, Size: size }, 'Only image/* attachments are inlined as image content. Metadata returned instead.'),
+      text: metadataText({ ...attachment, MimeType: effectiveMimeType, Size: size }, note),
     }],
   }
 }

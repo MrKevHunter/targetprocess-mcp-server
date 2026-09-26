@@ -74,6 +74,33 @@ describe('handleGetAttachmentContent', () => {
     expect(result.content[0].text).toContain('HTTP status: 404')
   })
 
+  it('does not inline as an image when the download content-type contradicts the metadata', async () => {
+    vi.mocked(mockTp.getAttachment).mockResolvedValue({ ok: true, data: attachment({ MimeType: 'image/png' }) } as any)
+    vi.mocked(mockTp.downloadAttachmentContent).mockResolvedValue({
+      ok: true,
+      data: { data: Buffer.from('<html>login</html>'), mimeType: 'text/html', size: 19 },
+    } as any)
+
+    const result = await handleGetAttachmentContent(mockTp, { attachmentId: '20748' })
+    const parsed = JSON.parse(result.content[0].text)
+
+    expect(result.content[0].type).toBe('text')
+    expect(parsed.note).toContain('authentication redirect')
+  })
+
+  it('still inlines as an image when the download reports a generic binary content-type', async () => {
+    vi.mocked(mockTp.getAttachment).mockResolvedValue({ ok: true, data: attachment({ MimeType: 'image/png' }) } as any)
+    vi.mocked(mockTp.downloadAttachmentContent).mockResolvedValue({
+      ok: true,
+      data: { data: Buffer.from('fake-bytes'), mimeType: 'application/octet-stream', size: 10 },
+    } as any)
+
+    const result = await handleGetAttachmentContent(mockTp, { attachmentId: '20748' })
+
+    expect(result.content[0].type).toBe('image')
+    expect((result.content[0] as any).mimeType).toBe('image/png')
+  })
+
   it('falls back to metadata + uri when content download fails', async () => {
     vi.mocked(mockTp.getAttachment).mockResolvedValue({ ok: true, data: attachment() } as any)
     vi.mocked(mockTp.downloadAttachmentContent).mockResolvedValue({ ok: false, status: 401, body: 'unauthorized' } as any)

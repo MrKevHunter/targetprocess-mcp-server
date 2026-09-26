@@ -1,3 +1,5 @@
+import { statSync } from 'fs'
+import { basename } from 'path'
 import type { TpClient } from '../tp.js'
 import type * as TP from '../types.js'
 
@@ -21,8 +23,22 @@ export async function handleAddAttachment(
   let displayName: string
 
   if (params.filePath) {
+    let size: number
+    try {
+      size = statSync(params.filePath).size
+    } catch (error) {
+      return { content: [{ type: 'text' as const, text: `Could not read "${params.filePath}": ${String(error)}` }] }
+    }
+    if (size > MAX_UPLOAD_BYTES) {
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Refusing to upload "${params.filePath}": size ${size} bytes exceeds the ${MAX_UPLOAD_BYTES} byte limit.`,
+        }],
+      }
+    }
     source = { filePath: params.filePath }
-    displayName = params.filePath
+    displayName = basename(params.filePath)
   } else {
     const decoded = Buffer.from(params.fileContent!, 'base64')
     if (decoded.byteLength > MAX_UPLOAD_BYTES) {
@@ -76,7 +92,7 @@ export async function handleAddAttachment(
   }
 
   const newItems = after.data.Items.filter((a) => !beforeIds.has(a.Id))
-  const match = newItems.find((a) => a.Name === displayName) || newItems[0]
+  const match = newItems.find((a) => a.Name === displayName)
 
   if (!match) {
     return {
