@@ -95,7 +95,21 @@ describe('access token redaction in logs', () => {
       text: async () => 'ok',
     }))
 
-    await tp.addAttachedFile('148980', { fileContent: 'aGk=', fileName: 'hi.txt' })
+    await tp.uploadAttachment('148980', { fileContent: 'aGk=', fileName: 'hi.txt' })
+
+    expectNoToken(logged())
+  })
+
+  it('redacts the token in the attachment-download URL, which is not percent-encoded', async () => {
+    const tp = await loadClient()
+    const logged = captureStderr()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(0),
+      headers: { get: () => 'image/png' },
+    }))
+
+    await tp.downloadAttachmentContent('/Attachment.aspx?AttachmentID=20748')
 
     expectNoToken(logged())
   })

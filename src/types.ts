@@ -307,6 +307,27 @@ export interface Owner {
   FullName: string
 }
 
+export interface AttachmentGeneral {
+  ResourceType: string
+  Id: number
+  Name: string
+  EntityType: EntityType
+}
+
+export interface Attachment {
+  ResourceType: string
+  Id: number
+  Name: string
+  Description: string
+  Date: string
+  MimeType: string
+  Uri: string
+  ThumbnailUri: string
+  Size: number
+  Owner: Owner
+  General: AttachmentGeneral
+}
+
 export interface Assignable {
   ResourceType: string
   Id: number
